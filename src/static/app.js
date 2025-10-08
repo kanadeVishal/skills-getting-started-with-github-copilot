@@ -48,12 +48,17 @@
         let participantsHTML = "";
         if (details.participants && details.participants.length > 0) {
           const listItems = details.participants
-            .map((p) => {
-              const safeName = escapeHtml(p);
-              const initials = escapeHtml(getInitials(p));
-              return `<li class="participant-item"><span class="avatar">${initials}</span><span class="participant-name">${safeName}</span></li>`;
-            })
-            .join("");
+              .map((p) => {
+                const safeName = escapeHtml(p);
+                const initials = escapeHtml(getInitials(p));
+                // Add a delete button with data attributes we can use to identify the participant
+                return `<li class="participant-item" data-participant="${safeName}">
+                          <span class="avatar">${initials}</span>
+                          <span class="participant-name">${safeName}</span>
+                          <button class="participant-delete" title="Unregister ${safeName}" data-email="${safeName}" data-activity="${escapeHtml(name)}">✕</button>
+                        </li>`;
+              })
+              .join("");
           participantsHTML = `<div class="participants-section">
               <h5>Participants</h5>
               <ul class="participants-list">${listItems}</ul>
@@ -74,6 +79,36 @@
         `;
 
         activitiesList.appendChild(activityCard);
+
+          // Attach click handlers for delete buttons using event delegation-like approach
+          // (we'll add a single listener on the activityCard to handle its delete buttons)
+          activityCard.addEventListener('click', async (ev) => {
+            const btn = ev.target.closest('.participant-delete');
+            if (!btn) return;
+            const email = btn.getAttribute('data-email');
+            const activityName = btn.getAttribute('data-activity');
+
+            if (!email || !activityName) return;
+
+            if (!confirm(`Unregister ${email} from ${activityName}?`)) return;
+
+            try {
+              const res = await fetch(`/activities/${encodeURIComponent(activityName)}/participants?email=${encodeURIComponent(email)}`, {
+                method: 'DELETE'
+              });
+
+              const json = await res.json();
+              if (res.ok) {
+                // Re-fetch activities to refresh UI
+                fetchActivities();
+              } else {
+                alert(json.detail || 'Failed to unregister participant');
+              }
+            } catch (err) {
+              console.error('Error unregistering participant', err);
+              alert('Failed to unregister participant');
+            }
+          });
 
         // Add option to select dropdown
         const option = document.createElement("option");
